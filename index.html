@@ -108,6 +108,7 @@
 		<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 		<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.1/jspdf-autotable.min.js"></script>
 		<script type="module">
+			import firebaseConfig from "./firebase-config.js";
 			import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
 			import {
 				getFirestore,
@@ -117,16 +118,6 @@
 				orderBy,
 				onSnapshot,
 			} from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
-
-			const firebaseConfig = {
-				apiKey: "AIzaSyCe0UHiualJOGmsCzNvzFTw8SKMjeYRhSw",
-				authDomain: "blutdruck-app-f5cd5.firebaseapp.com",
-				projectId: "blutdruck-app-f5cd5",
-				storageBucket: "blutdruck-app-f5cd5.firebasestorage.app",
-				messagingSenderId: "1065023739171",
-				appId: "1:1065023739171:web:fab3b38c155909ae44e896",
-				measurementId: "G-NS9S2LMRY5",
-			};
 
 			const app = initializeApp(firebaseConfig);
 			const db = getFirestore(app);
@@ -147,18 +138,26 @@
 						return alert("Bitte alle Felder ausfüllen!");
 
 					try {
-						await addDoc(messungRef, {
+						console.log("Versuche Daten zu speichern...", { sys, dia, puls });
+						const docRef = await addDoc(messungRef, {
 							sys: parseInt(sys),
 							dia: parseInt(dia),
 							puls: parseInt(puls),
 							zeitpunkt: new Date(),
 						});
+						console.log("Erfolgreich gespeichert! Dokumenten-ID:", docRef.id);
+
 						// Felder leeren
 						document.getElementById("sys").value = "";
 						document.getElementById("dia").value = "";
 						document.getElementById("puls").value = "";
 					} catch (e) {
-						alert("Fehler beim Speichern: " + e.message);
+						console.error("Fehler beim Speichern detailiert:", e);
+						let msg = "Fehler beim Speichern: " + e.message;
+						if (e.code === "permission-denied") {
+							msg += "\n\n(Prüfen Sie Ihre Firebase Security Rules! Wahrscheinlich fehlt die Schreibberechtigung.)";
+						}
+						alert(msg);
 					}
 				});
 
