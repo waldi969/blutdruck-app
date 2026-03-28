@@ -22,6 +22,11 @@
 				box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
 				margin-bottom: 20px;
 			}
+			.chart-container {
+				position: relative;
+				height: 300px;
+				width: 100%;
+			}
 			h2 {
 				color: var(--primary);
 				margin-top: 0;
@@ -87,15 +92,22 @@
 		</div>
 
 		<div class="card">
-			<h2>Deine Historie (Cloud)</h2>
-			<div id="liste">Verbinde mit Datenbank...</div>
-			<button class="secondary" onclick="exportieren()">
-				Als PDF (Vorbereitung)
-			</button>
+			<h2>Verlauf</h2>
+			<div class="chart-container">
+				<canvas id="verlaufChart"></canvas>
+			</div>
 		</div>
 
+		<div class="card">
+			<h2>Deine Historie (Cloud)</h2>
+			<div id="liste">Verbinde mit Datenbank...</div>
+			<button id="btnExport" class="secondary">Als PDF exportieren</button>
+		</div>
+
+		<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+		<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+		<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.1/jspdf-autotable.min.js"></script>
 		<script type="module">
-			// 1. Firebase Bibliotheken importieren
 			import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
 			import {
 				getFirestore,
@@ -106,7 +118,6 @@
 				onSnapshot,
 			} from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
-			// 2. Deine Konfiguration (war korrekt!)
 			const firebaseConfig = {
 				apiKey: "AIzaSyCe0UHiualJOGmsCzNvzFTw8SKMjeYRhSw",
 				authDomain: "blutdruck-app-f5cd5.firebaseapp.com",
@@ -117,13 +128,15 @@
 				measurementId: "G-NS9S2LMRY5",
 			};
 
-			// 3. Firebase initialisieren
 			const app = initializeApp(firebaseConfig);
 			const db = getFirestore(app);
 			const messungRef = collection(db, "messungen");
 
-			// 4. Speicher-Funktion
-			document
+			// Globale Variablen für Chart und Export
+			let messungenData = [];
+			let verlaufChart;
+
+			document // Speicher-Funktion
 				.getElementById("btnSpeichern")
 				.addEventListener("click", async () => {
 					const sys = document.getElementById("sys").value;
@@ -149,26 +162,130 @@
 					}
 				});
 
-			// 5. Echtzeit-Anzeige der Daten
+			// Chart-Funktion
+			function createOrUpdateChart(data) {
+				const ctx = document.getElementById("verlaufChart").getContext("2d");
+				const labels = data
+					.map((d) =>
+						d.zeitpunkt
+							? d.zeitpunkt.toDate().toLocaleString("de-DE", {
+									day: "2-digit",
+									month: "2-digit",
+									hour: "2-digit",
+									minute: "2-digit",
+								})
+							: "",
+					)
+					.reverse();
+				const sysData = data.map((d) => d.sys).reverse();
+				const diaData = data.map((d) => d.dia).reverse();
+				const pulsData = data.map((d) => d.puls).reverse();
+
+				if (verlaufChart) {
+					verlaufChart.data.labels = labels;
+					verlaufChart.data.datasets[0].data = sysData;
+					verlaufChart.data.datasets[1].data = diaData;
+					verlaufChart.data.datasets[2].data = pulsData;
+					verlaufChart.update();
+				} else {
+					verlaufChart = new Chart(ctx, {
+						type: "line",
+						data: {
+							labels: labels,
+							datasets: [
+								{
+									label: "Systole",
+									data: sysData,
+									borderColor: "#f44336",
+									backgroundColor: "#f4433633",
+									fill: true,
+									tension: 0.2,
+								},
+								{
+									label: "Diastole",
+									data: diaData,
+									borderColor: "#2196f3",
+									backgroundColor: "#2196f333",
+									fill: true,
+									tension: 0.2,
+								},
+								{
+									label: "Puls",
+									data: pulsData,
+									borderColor: "#4caf50",
+									backgroundColor: "#4caf5033",
+									fill: true,
+									tension: 0.2,
+									yAxisID: "y1", // Sekundäre Achse für Puls
+								},
+							],
+						},
+						options: {
+							responsive: true,
+							maintainAspectRatio: false,
+							scales: {
+								y: {
+									beginAtZero: false,
+									position: "left",
+									title: { display: true, text: "Blutdruck (mmHg)" },
+								},
+								y1: {
+									beginAtZero: false,
+									position: "right",
+									title: { display: true, text: "Puls (bpm)" },
+									grid: { drawOnChartArea: false },
+								},
+							},
+						},
+					});
+				}
+			}
+
+			// Echtzeit-Anzeige der Daten
 			const q = query(messungRef, orderBy("zeitpunkt", "desc"));
 			onSnapshot(q, (snapshot) => {
-				let html = "<table><tr><th>Datum</th><th>SYS</th><th>DIA</th></tr>";
+				const messungen = [];
+				let html =
+					"<table><tr><th>Datum</th><th>SYS</th><th>DIA</th><th>Puls</th></tr>";
 				snapshot.forEach((doc) => {
 					const d = doc.data();
-					const datum = d.zeitpunkt
-						? d.zeitpunkt.toDate().toLocaleString("de-DE")
-						: "Lädt...";
-					html += `<tr><td>${datum}</td><td>${d.sys}</td><td>${d.dia}</td></tr>`;
+					messungen.push(d);
+					const datum = d.zeitpunkt.toDate().toLocaleString("de-DE");
+					html += `<tr><td>${datum}</td><td>${d.sys}</td><td>${d.dia}</td><td>${d.puls}</td></tr>`;
 				});
 				html += "</table>";
 				document.getElementById("liste").innerHTML = html;
-			});
-		</script>
 
-		<script>
-			function exportieren() {
-				alert("Hier binden wir im nächsten Schritt die PDF-Funktion ein!");
-			}
+				messungenData = messungen; // Daten für Export bereitstellen
+				createOrUpdateChart(messungen); // Chart aktualisieren
+			});
+
+			// Export-Funktion
+			document.getElementById("btnExport").addEventListener("click", () => {
+				if (messungenData.length === 0) {
+					return alert("Keine Daten zum Exportieren vorhanden.");
+				}
+
+				const { jsPDF } = window.jspdf;
+				const doc = new jsPDF();
+
+				doc.text("Blutdruck-Historie", 14, 16);
+
+				const tableData = messungenData.map((d) => [
+					d.zeitpunkt.toDate().toLocaleString("de-DE"),
+					d.sys,
+					d.dia,
+					d.puls,
+				]);
+
+				doc.autoTable({
+					head: [["Datum", "Systole (mmHg)", "Diastole (mmHg)", "Puls (bpm)"]],
+					body: tableData,
+					startY: 20,
+				});
+
+				doc.save("blutdruck-historie.pdf");
+			});
 		</script>
 	</body>
 </html>
