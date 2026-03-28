@@ -122,7 +122,7 @@
 				apiKey: "AIzaSyCe0UHiualJOGmsCzNvzFTw8SKMjeYRhSw",
 				authDomain: "blutdruck-app-f5cd5.firebaseapp.com",
 				projectId: "blutdruck-app-f5cd5",
-				storageBucket: "blutdruck-app-f5cd5.firebasestorage.app",
+				storageBucket: "blutdruck-app-f5cd5.appspot.com",
 				messagingSenderId: "1065023739171",
 				appId: "1:1065023739171:web:fab3b38c155909ae44e896",
 				measurementId: "G-NS9S2LMRY5",
@@ -249,9 +249,13 @@
 					"<table><tr><th>Datum</th><th>SYS</th><th>DIA</th><th>Puls</th></tr>";
 				snapshot.forEach((doc) => {
 					const d = doc.data();
-					messungen.push(d);
-					const datum = d.zeitpunkt.toDate().toLocaleString("de-DE");
-					html += `<tr><td>${datum}</td><td>${d.sys}</td><td>${d.dia}</td><td>${d.puls}</td></tr>`;
+					// Sicherstellen, dass der Eintrag einen Zeitstempel hat, um Fehler zu vermeiden
+					if (d.zeitpunkt && d.zeitpunkt.toDate) {
+						messungen.push(d);
+						const datum = d.zeitpunkt.toDate().toLocaleString("de-DE");
+						const puls = d.puls || "-"; // Fallback für alte Einträge ohne Puls
+						html += `<tr><td>${datum}</td><td>${d.sys}</td><td>${d.dia}</td><td>${puls}</td></tr>`;
+					}
 				});
 				html += "</table>";
 				document.getElementById("liste").innerHTML = html;
